@@ -48,10 +48,80 @@ or.elim lhs
 iff.intro rimp limp
 
 -- this needs classical 
-example : (∀ x, p x) ↔ ¬ (∃ x, ¬ p x) := sorry
-example : (∃ x, p x) ↔ ¬ (∀ x, ¬ p x) := sorry
-example : (¬ ∃ x, p x) ↔ (∀ x, ¬ p x) := sorry
-example : (¬ ∀ x, p x) ↔ (∃ x, ¬ p x) := sorry
+section
+open classical 
+example : (∀ x, p x) ↔ ¬ (∃ x, ¬ p x) := 
+have rimp : (∀ x, p x) →  ¬ (∃ x, ¬ p x), from
+assume rhs : (∀ x, p x), 
+assume h : (∃ x, ¬ p x),
+match h with ⟨a, npa⟩ :=
+  npa (rhs a)
+end,
+have limp : ¬(∃ x, ¬ p x) → (∀ x, p x), from
+assume rhs : ¬(∃ x, ¬ p x),
+assume x : α,
+by_contradiction
+  (assume npx : ¬ (p x),
+    (rhs ⟨x, npx⟩)),
+iff.intro rimp limp
+
+example : (∃ x, p x) ↔ ¬ (∀ x, ¬ p x) := 
+have rimp : (∃ x, p x) → ¬ (∀ x, ¬ p x), from 
+assume rhs : (∃ x, p x), 
+show ¬(∀ x, ¬ p x), from
+by_contradiction
+  (assume h : ¬¬ ∀ x, ¬ p x,
+    have nnh : ∀ x, ¬ p x, from
+      by_contradiction
+        (assume nh : ¬ (∀ x, ¬ p x),
+          h nh),
+    match rhs with ⟨a, pa⟩ := 
+      (nnh a) pa
+    end),
+have limp : ¬ (∀ x, ¬ p x) → (∃ x, p x), from 
+(assume h : ¬ (∀ x, ¬ p x), show ∃ x, p x, from by_contradiction
+  (assume t : ¬(∃ x, p x),
+    have ∀ x, ¬ p x, from 
+      (assume x, show ¬ p x, from
+        by_contradiction
+          (assume h : ¬ ¬ p x,
+            have nnh : p x, from 
+              by_contradiction
+                (assume nh : ¬ p x, h nh),
+            t ⟨x, nnh⟩)),
+    h this)),
+iff.intro rimp limp
+
+example : (¬ ∃ x, p x) ↔ (∀ x, ¬ p x) := 
+have rimp : (¬ ∃ x, p x) → (∀ x, ¬ p x), from 
+assume (rhs : ¬ ∃ x, p x) (x : α) (h : p x), (rhs ⟨x, h⟩),
+suffices limp : (∀ x, ¬ p x) → (¬ ∃ x, p x), from iff.intro rimp limp,
+assume h : (∀ x, ¬ p x),
+show ¬ ∃ x, p x, from 
+by_cases
+  (assume t : (∃ x, p x), 
+    match t with ⟨a, pa⟩ := false.elim (h a pa) end)
+  (assume t : ¬(∃ x, p x), t)
+
+example : (¬ ∀ x, p x) ↔ (∃ x, ¬ p x) := 
+suffices limp : (∃ x, ¬ p x) → (¬ ∀ x, p x), from 
+suffices rimp : (¬ ∀ x, p x) → (∃ x, ¬ p x), from
+iff.intro rimp limp,
+assume rhs : (¬ ∀ x, p x),
+by_contradiction
+  (assume con : ¬ ∃ x, ¬ p x,
+    have h: ∀ x, p x, from 
+      (assume x : α,
+        show p x, from by_contradiction
+          (assume t : ¬ p x,
+            con ⟨x, t⟩)),
+    show false, from rhs h),
+assume lhs : (∃ x, ¬ p x),
+assume h: ∀ x, p x, 
+match lhs with ⟨a, npa⟩ :=
+  npa (h a)
+end
+
 
 example : (∀ x, p x → r) ↔ (∃ x, p x) → r := 
 have rimp : (∀ x, p x → r) → (∃ x, p x) → r, from
@@ -66,8 +136,6 @@ assume h : p x,
 show r, from h₁ ⟨x, h⟩,
 iff.intro rimp limp
 
-section
-open classical 
 
 example (a : α) : (∃ x, p x → r) ↔ (∀ x, p x) → r := 
 have rimp : (∃ x, p x → r) → (∀ x, p x) → r, from
@@ -94,6 +162,26 @@ by_cases
         (assume h : p x, false.elim (hx h)),
       ⟨x, t⟩
     end)
-end
 
-example (a : α) : (∃ x, r → p x) ↔ (r → ∃ x, p x) := sorry
+example (a : α) : (∃ x, r → p x) ↔ (r → ∃ x, p x) := 
+have rimp : (∃ x, r → p x) → (r → ∃ x, p x), from 
+assume h₁ : (∃ x, r → p x),
+match h₁ with ⟨a, h⟩ :=
+  (assume t : r, 
+    have h₂ : p a, from h t,
+    ⟨a, h₂⟩)
+end,
+have limp : (r → ∃ x, p x) → (∃ x, r → p x), from
+assume rhs : (r → ∃ x, p x),
+by_cases
+  (assume h : r,
+    match (rhs h) with ⟨a, pa⟩ :=
+      have t : (r → p a), from (assume g : r, pa),
+      show (∃ x, r → p x), from ⟨a, t⟩
+    end)
+  (assume nh : ¬r,
+    suffices r → p a, from ⟨a, this⟩, 
+    (assume h : r, false.elim (nh h))),
+iff.intro rimp limp
+
+end
