@@ -69,15 +69,8 @@ example : (∃ x, p x) ↔ ¬ (∀ x, ¬ p x) :=
 have rimp : (∃ x, p x) → ¬ (∀ x, ¬ p x), from 
 assume rhs : (∃ x, p x), 
 show ¬(∀ x, ¬ p x), from
-by_contradiction
-  (assume h : ¬¬ ∀ x, ¬ p x,
-    have nnh : ∀ x, ¬ p x, from
-      by_contradiction
-        (assume nh : ¬ (∀ x, ¬ p x),
-          h nh),
-    match rhs with ⟨a, pa⟩ := 
-      (nnh a) pa
-    end),
+assume h : ∀ x, ¬ p x, 
+match rhs with ⟨a, pa⟩ := ((h a) pa) end,
 have limp : ¬ (∀ x, ¬ p x) → (∃ x, p x), from 
 (assume h : ¬ (∀ x, ¬ p x), show ∃ x, p x, from by_contradiction
   (assume t : ¬(∃ x, p x),
