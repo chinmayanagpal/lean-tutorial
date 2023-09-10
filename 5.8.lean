@@ -145,3 +145,19 @@ begin
 end
 
 end
+
+-- exercise 3.3
+section
+variable p: Prop
+
+example : ¬(p ↔ ¬p) := 
+begin
+  intro h, 
+  cases h, 
+  by_cases p, 
+    have : ¬p, from h_mp h, 
+    contradiction, 
+  have : p, from h_mpr h,
+  contradiction
+end
+end
