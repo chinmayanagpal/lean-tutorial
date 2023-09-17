@@ -237,3 +237,59 @@ def foo : char → ℕ
 
 #print foo._main
 end six
+
+
+-- 8.3 Structural Recursion and Induction
+
+/- equation compiler also supports recursive definitions. next three sections: 
+
+   - structurally recursive definitions
+   - well-founded recursive definitions
+   - mutually recursive definitions 
+generally it processes inputs of the form
+
+def foo (a ; α) : Π (b : β), γ
+| [patterns₁] := t₁
+...
+| [patternsₙ] := tₙ
+
+a is a sequence of parameters
+b is a sequence of arguments on which pattern matching takes place
+γ is any type, which can depend on a and b
+
+each line should contain the same number of patterns, one for each element of β
+pattern is either a variable, a constructor applied to other patterns, or
+an expression that normalises to something of that form
+
+constructor appearance prompts case splits
+
+in section 8.6 : "inaccessible terms", sometimes necessary to include explicit
+terms in patterns. but we do not encounter these until section 8.6
+
+t₁, ..., tₙ can make use of any of the parameters a, as well as any of the
+variables that are introduced in corresponding patterns. but: also can 
+have references to `foo`. 
+
+this section: structural recursion, where argumetns to foo on the RHS are
+subterms of the patterns on the LHS (i.e. arguments to constructors). idea is
+that they are structurall smaller, so they  appear in the inductive type at an
+earlier stage. 
+
+examples: 
+-/
+namespace six 
+open nat
+def add : nat → nat → nat
+| m zero     := m
+| m (succ n) := succ (add m n)
+
+local infix (name :=add) ` + ` := add
+
+theorem add_zero (m : nat) : m + zero = m := rfl
+theorem add_succ (m n : nat) : m + succ n = succ(m + n) := rfl
+
+theorem zero_add : ∀ n, zero + n = n
+| zero     := rfl
+| (succ n) := congr_arg succ (zero_add n)
+
+end six
