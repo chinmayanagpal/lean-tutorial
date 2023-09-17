@@ -292,4 +292,131 @@ theorem zero_add : ∀ n, zero + n = n
 | zero     := rfl
 | (succ n) := congr_arg succ (zero_add n)
 
+def mul : nat → nat → nat
+| n zero     := zero
+| n (succ m) := (mul n m) + n
+
+/-
+equation compiler tries to make sure that the defining equations hold
+definitionally; i.e. we can use "refl" to prove them. 
+however, sometimes they only hold propositionally: they are equational
+theorems that must be applied explicitly. the equation compiler generates
+such theorems internally. they are not meant to be used by the user; rather,
+simp and rewrite are configured to use them where necessary. 
+-/
 end six
+
+namespace seven
+open nat
+def add : nat → nat → nat
+| m zero     := m
+| m (succ n) := succ (add m n)
+
+local infix (name :=add) ` + ` := add
+
+theorem zero_add : ∀ n, zero + n = n 
+| zero     := by simp [add]
+| (succ n) := by simp [add, zero_add n]
+
+/-
+there is a `dsimp` tactic, that performs definitional reductions only. this 
+can be used to carry out the first step. 
+-/
+
+theorem zero_add' : ∀ n, zero + n = n
+| zero     := by dsimp [add]; reflexivity
+| (succ n) := by dsimp[add]; rw [zero_add n]
+end seven
+
+/- 
+as with definition by pattern matching, parameters to a structural 
+recursion or induction may appear before the colon. such parameters
+are simply added to the local context before the definition is
+processed. e.g. the definition of addition may also be written
+as follows:
+-/
+namespace eight
+open nat
+def add (m : ℕ) : ℕ → ℕ
+| zero  := m
+| (succ n) := succ (add n)
+end eight
+
+
+-- more interesting example of structural recursion is given by 
+-- the fibonacci function `fib`
+
+namespace nine
+def fib : nat → nat
+| 0 := 1
+| 1 := 1
+| (n+2) := fib (n+1) + fib(n)
+-- bad recursive definition; for fib(n) it needs to calculate 
+-- fib(n-1) and fib(n-2), and so on. this is bad. 
+
+example : fib 0 = 1 := rfl
+example : fib 1 = 1 := rfl
+example (n : nat) : fib (n + 2) = fib (n + 1) + fib n := rfl
+
+example : fib 7 = 21 := rfl
+example : fib 7 = 21 := 
+begin
+  dsimp [fib], 
+  refl 
+end
+end nine
+
+namespace ten
+def fib_aux : nat → nat × nat
+| 0       := (0, 1)
+| (n + 1) := let p := fib_aux n in (p.2, p.1 + p.2)
+-- this stores both the current and the next answer;
+-- thus the next one stores the .2 of the current, and so on
+-- this has complexity linear in n 
+
+def append {α : Type*} : list α → list α → list α
+| []       l := l
+| (h :: t) l := h :: append t l 
+
+example: append [(1 : ℕ), 2, 3] [4, 5]  = [1, 2, 3, 4, 5] := rfl
+end ten
+
+
+-- 8.4: Well-founded recursion and induction
+namespace eleven
+universe u
+variable α : Sort u
+variable r : α → α → Prop
+
+#check acc r
+#check well_founded r
+end eleven
+
+-- given x, acc r x is equivalent to: 
+-- ∀ y, r y x → acc r y 
+-- in infix notation, if y `r` x, then acc r x implies acc r y. that is, 
+-- if you think of r as denoting an order relation <, then acc r x says 
+-- that x is accessible from below, in the sense that all its
+-- predecessors are accessible from below. the statement that r is
+-- well-founded, denoted `well_founded r`, is exactly the statement that
+-- every element of th etype is accessible. 
+
+-- at the end you have the r-infimum elements, which are vacuously
+-- accessible from below, since they do not have any predecessors.
+
+-- thus if r is a well-founded relation on a type α, then we should have 
+-- a principle of well-founded recursion on α, with respect to the
+-- relation r. and the standard library defines well_founded.fix, which
+-- serves exactly that purpose
+
+namespace twelve
+universes u v
+variable α : Sort u
+variable r : α → α → Prop
+variable h : well_founded r
+
+variable C : α → Sort v
+variable F : Π x, (Π (y: α), r y x → C y) → C x
+
+def f : Π (x : α) , C x := well_founded.fix h F
+end twelve
