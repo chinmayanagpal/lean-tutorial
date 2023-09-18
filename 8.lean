@@ -502,3 +502,87 @@ def nat_to_bin : ℕ → list ℕ
 
 #eval nat_to_bin 1234567
 end fifteen
+
+
+-- 8.5 Mutual Recursion
+namespace sixteen
+mutual def even, odd
+with even : nat → bool
+| 0     := tt
+| (a+1) := odd a
+with odd : nat → bool
+| 0     := ff
+| (a+1) := even a
+
+example (a : nat) : even (a + 1) = odd a  := 
+by simp [even]
+
+example (a : nat) : odd  (a + 1) = even a := 
+by simp [odd]
+
+lemma even_eq_not_odd : ∀ a, even a = bnot (odd a) :=
+begin
+  intro a,
+  induction a,
+    simp [even, odd],
+  simp[a_ih, even, odd]
+end
+end sixteen
+
+namespace seventeen
+mutual inductive even, odd
+with even : ℕ → Prop
+| even_zero : even 0
+| even_succ : ∀ n, odd n → even(n + 1)
+with odd : ℕ → Prop
+| odd_succ : ∀ n, even n → odd(n + 1)
+
+-- namespaces! 
+open even odd
+
+theorem not_odd_zero : ¬ odd 0.
+
+mutual theorem even_of_odd_succ, odd_of_even_succ 
+with even_of_odd_succ : ∀ n, odd (n + 1) → even n
+| _ (odd_succ n h) := h
+-- since odd (n + 1) is constructed using even (n)
+with odd_of_even_succ : ∀ n, even (n + 1) → odd n
+| _ (even_succ n h) := h
+
+inductive term
+| const : string → term
+| app : string → list term → term
+
+open term
+
+mutual def num_consts, num_consts_lst
+with num_consts : term → nat
+| (term.const n)  := 1
+| (term.app n ts) := num_consts_lst ts
+with num_consts_lst : list term → nat
+| []      := 0
+| (t::ts) := num_consts t + num_consts_lst ts
+
+def sample_term := app "f" [app "g" [const "x"], const "y"]
+
+#eval num_consts sample_term
+end seventeen
+
+-- 8.6 Dependent Pattern Matching
+
+namespace eighteen
+universe u
+
+inductive vector (α : Type u) : nat → Type u
+| nil {} : vector 0
+| cons   : Π {n}, α → vector n → vector (n + 1)
+
+namespace vector
+local notation (name := cons) h :: t := cons h t
+
+
+-- say 
+
+#check @vector.cases_on
+end vector
+end eighteen
