@@ -401,8 +401,12 @@ end eleven
 -- well-founded, denoted `well_founded r`, is exactly the statement that
 -- every element of th etype is accessible. 
 
--- at the end you have the r-infimum elements, which are vacuously
+-- at the end you have the r-minimum elements, which are vacuously
 -- accessible from below, since they do not have any predecessors.
+
+-- thus if there is no end to a chain of elements, then there is no place to
+-- start building proofs of accessibility from (e.g. negative integers {-1, -2,
+-- -3, ..} w.r.t the order relation <
 
 -- thus if r is a well-founded relation on a type α, then we should have 
 -- a principle of well-founded recursion on α, with respect to the
@@ -412,11 +416,89 @@ end eleven
 namespace twelve
 universes u v
 variable α : Sort u
+-- binary relation on α
 variable r : α → α → Prop
+-- the statement that all variables are accessible from below
 variable h : well_founded r
 
 variable C : α → Sort v
+-- a function, given x : α, and given a C y for each y that precedes x, 
+-- returns C x
 variable F : Π x, (Π (y: α), r y x → C y) → C x
 
+-- use F to define a function f, using our proof that r is well-founded
 def f : Π (x : α) , C x := well_founded.fix h F
+
+
+-- lean knows that the usual order < on the natural numbers is well-founded
+-- it also knows some ways of constructing new well-founded orders from others,
+-- e.g. using lexicographic order
 end twelve
+
+-- definition of division in standard library (in essence) is the following
+
+namespace thirteen
+open nat
+
+def div_rec_lemma {x y : ℕ} : 0 < y ∧ y ≤ x → x - y < x :=
+λ h, nat.sub_lt (lt_of_lt_of_le h.left h.right) h.left
+-- don't look at this proof because it uses an equally obvious lemma 
+
+-- given x, and given a division function for all predecessors of x, 
+-- a definition of division of x by some variable
+def div.F (x : ℕ) (f : Π x₁, x₁ < x → ℕ → ℕ)  (y : ℕ) : ℕ :=
+if h : 0 < y ∧ y ≤ x then
+  f (x - y) (div_rec_lemma h) y + 1
+  -- use the division function by showing x - y is a predecessor of x
+else
+  zero
+  
+-- use recursion: because < is well-founded, we can recursively define 
+-- "f" using F. 
+def div := well_founded.fix lt_wf div.F
+-- lt_wf is a proof of well_founded lt
+end thirteen
+
+namespace fourteen
+def div : ℕ → ℕ → ℕ
+| x y :=
+  if h : 0 < y ∧ y ≤ x then
+    have x - y < x, from nat.sub_lt (lt_of_lt_of_le h.left h.right) h.left,
+  div (x - y) y + 1
+  else 0
+  
+-- equation compiler first tries structural recursion
+-- and if that fails, it tries well-founded recursion
+-- it tries the lexicographic ordering on the pair (x, y). 
+-- thus we have to tell it that x - y < x, to prompt it to
+-- use the ordering <.
+-- defining equation for div does /not/ hold definitionally, 
+-- but it is available to rewrite and simp
+-- simplifier will loop indefinitely, but rw applies it once
+
+example (x y : nat) : div  x y = if 0 < y ∧ y ≤ x then div (x -y) y + 1 else 0
+:= by { rw [div] }
+
+example (x y : nat) (h : 0 < y ∧ y ≤ x) : 
+div x y = div (x - y) y + 1  :=
+by rw [div, if_pos h]
+end fourteen
+
+-- similar: converts natural number to binary expression.
+-- we have to provide the equation compiler with evidence
+-- that the recursive call is decreasing; which we do here
+-- with a `sorry`. this does not prevent the bytecode evaluator from evaluating
+-- the function successfully 
+
+namespace fifteen
+def nat_to_bin : ℕ → list ℕ 
+| 0       := [0]
+| 1       := [1]
+| (n + 2) := 
+  have (n + 2) / 2 < n + 2, from sorry,
+    nat_to_bin ((n + 2) / 2) ++ [n % 2]
+
+-- even thoguh we use sorry, we can still use the function 
+
+#eval nat_to_bin 1234567
+end fifteen
