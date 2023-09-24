@@ -580,9 +580,164 @@ inductive vector (α : Type u) : nat → Type u
 namespace vector
 local notation (name := cons) h :: t := cons h t
 
-
--- say 
-
+-- say we wnat to define a tail function for vector α (n + 1)
+-- this necessarily has a tail since n + 1 means the term can not be nil
+-- but how do we tell that to cases_on? 
 #check @vector.cases_on
+-- can do this:
+
+def tail_aux {α : Type*} {n m : ℕ} (v : vector α m) :
+  m = n + 1 → vector α n :=
+vector.cases_on v
+  (assume H : 0 = n + 1, nat.no_confusion H)
+  (assume m (a : α) w : vector α m, 
+    assume H : m + 1 = n + 1, 
+    nat.no_confusion H (λ H1 : m = n, eq.rec_on H1 w))
+
+def tail' {α : Type*} {n : ℕ} (v : vector α (n + 1)) : vector α n :=
+tail_aux v rfl
+
+-- much easier using recursive equations, using the eqn compiler
+
+def head {α : Type*} : Π {n}, vector α (n + 1) → α 
+| n (h :: t) := h
+
+def tail {α : Type*} : Π {n}, vector α (n + 1) → vector α n
+| n (h :: t) := t
+
+lemma eta {α : Type*} : ∀ {n} (v : vector α (n + 1)), head v :: tail v = v
+| n (h :: t) := rfl
+
+def map {α β γ : Type*} (f : α → β → γ) :
+  Π {n}, vector α n → vector β n → vector γ n
+| 0      nil    nil   := nil
+| (n + 1) (a :: va) (b :: vb) := f a b :: map va vb
+
+def zip {α β : Type*} :
+  Π {n}, vector α n → vector β n → vector (α × β) n
+| 0      nil        nil       := nil
+| (n+1)  (a :: va)  (b :: vb) := (a, b) :: zip va vb
+-- we can omit recursive equations for "unreachable" cases. the automatically
+-- generated definitions for indexed families are far from straightforward. e.g. 
+#print map
+#print map._main
 end vector
 end eighteen
+
+-- 8.7 Inaccessible Terms
+namespace nineteen
+universe u
+variables {α β : Type u}
+
+-- image_of f b is an attestation to the fact that
+-- b is in the image of f. it is constructed using an 
+-- element of α
+inductive image_of (f : α → β) : β → Type u
+| imf : Π a, image_of (f a)
+
+open image_of
+def inverse {f : α → β} : ∀ b, image_of f b → α
+| .(f a) (imf a) := a
+-- this is just a way of annotating the form of the input
+
+inductive vector (α : Type u) : ℕ → Type u
+| nil {} : vector 0 
+| cons : Π {n}, α → vector n → vector (n+1)
+
+namespace vector
+local notation (name := cons) h :: t := cons h t
+
+def add [has_add α] : Π {n : ℕ}, vector α n → vector α n → vector α n
+| 0     nil         nil          := nil
+| (n+1) (cons a v)  (cons b w)   := cons(a + b) (add v w)
+
+-- case split is not really required on n!
+def add' [has_add α] : Π {n : ℕ}, vector α n → vector α n → vector α n
+| ._ nil          nil        := nil
+| ._ (cons a v)   (cons b w) := cons (a + b) (add' v w)
+
+def add'' [has_add α] : Π {n : ℕ}, vector α n → vector α n → vector α n
+| .(0)   nil                nil        := nil
+| .(n+1) (@cons α n a v) (cons b w) := cons (a + b) (add'' v w)
+end vector
+end nineteen
+
+-- 8.8: Match Expressions
+namespace twenty
+def is_not_zero (m : ℕ) : bool :=
+match m with
+| 0     := ff
+| (n+1) := tt
+end
+
+-- in fact, match can be used anywhere, with arbitrary arguments
+variable {α : Type*}
+variable p : α → bool
+
+def filter : list α → list α
+| []       := []
+| (a :: l) := 
+  match p a with 
+  | tt := a :: filter l
+  | ff := filter l
+  end
+
+#reduce filter is_not_zero [1, 0, 0, 3, 0, 1]
+
+def foo (n : ℕ) (b c : bool) :=
+5 + match n - 5, b && c with
+  | 0,   tt := 0
+  | m+1, tt := m + 7
+  | 0,   ff := 5
+  | m+1, ff := m + 3
+  end
+  
+
+/- note that commas are required in pattern matching for ordinary recursive
+ functions. this is because arbitrary terms are allowed. writing
+ (n - 5) (b &&c) would be the result of applying the former to the
+ latter. for consistency, the patterns in each line are separated
+ by commas as well (and not parentheses). -/
+
+#eval foo 7 tt ff
+
+/- lean internally uses the `match` to implement a pattern matching
+ `assume`, as well as a pattern matching let. thus all four of the
+ following have the same net effect -/
+
+def bar₁ : ℕ × ℕ → ℕ
+| (m, n) := m + n
+
+def bar₂ (p: ℕ × ℕ) : ℕ :=
+match p with (m, n) := m + n end
+-- this uses () as a general de-structor
+
+def bar₃ : ℕ × ℕ → ℕ :=
+λ ⟨m, n⟩, m + n
+-- this makes specific reference to the and.intro ⟨, ⟩ constructor notation
+
+def bar₄ (p : ℕ × ℕ) : ℕ :=
+let ⟨m, n⟩ := p in m + n
+
+end twenty
+
+-- these variations are equally useful for destructing propositions: 
+
+namespace twentyone
+variables p q : ℕ → Prop
+
+example : (∃ x, p x) → (∃ y, q y) → ∃ x y, p x ∧ q y 
+| ⟨x, px⟩ ⟨y, qy⟩ := ⟨x, y, px, qy⟩
+-- above is shorthand for ⟨x ⟨y, ⟨px ∧ qy⟩⟩⟩
+example (h₀ : ∃ x, p x) (h₁ : ∃ y, q y) : ∃ x y, p x ∧ q y :=
+match h₀, h₁ with ⟨x, px⟩, ⟨y, qy⟩ := ⟨x, y, px, qy⟩
+end
+
+example : (∃ x, p x) → (∃ y, q y) → ∃ x y, p x ∧ q y :=
+λ ⟨x, px⟩ ⟨y, qy⟩, ⟨x, y, px, qy⟩
+
+example (h₀ : ∃ x, p x) (h₁ : ∃ y, q y) :
+∃ x y, p x ∧ q y :=
+let ⟨x, px⟩ := h₀,
+    ⟨y, qy⟩ := h₁ in ⟨x, y, px, qy⟩
+end twentyone
