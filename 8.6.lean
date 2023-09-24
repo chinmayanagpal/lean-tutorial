@@ -1,29 +1,71 @@
 import tactic.suggest
-universe u
-inductive vector (α : Type u) : nat → Type u
-| nil {} : vector 0
-| cons   : Π {n}, α → vector n → vector (n + 1)
+inductive aexpr : Type
+| const: ℕ → aexpr
+| var : ℕ → aexpr
+| plus : aexpr → aexpr → aexpr
+| times : aexpr → aexpr → aexpr
 
-namespace vector
-local notation (name := cons) h :: t := cons h t
+open aexpr
 
-def head {α : Type*} : Π {n}, vector α (n+1) → α
-| n (h :: t) := h
+def sample_aexpr : aexpr :=
+plus (times (var 0 ) (const 7)) (times (const 2) (var 1))
 
-def tail {α : Type*} : Π {n}, vector α (n+1) → vector α n
-| n (h :: t) := t
+def aeval (v : ℕ → ℕ) : aexpr → ℕ 
+| (const n)    := n
+| (var n)      := v n
+| (plus e₁ e₂)  := (aeval e₁) + (aeval e₂)
+| (times e₁ e₂) := (aeval e₁) * (aeval e₂)
 
-def append_aux {α : Type*} {m n: ℕ} (v₁: vector α m) (v₂ : vector α n) : (∀ l : ℕ, l = m + n → vector α l) :=
-begin
-induction v₁ with m head tail ih, 
-  exact (λ (l) h : l = 0 + n, by { rw[nat.zero_add] at h, exact eq.rec_on (eq.symm h) v₂ }),
-  intro l, intro h, 
-  have tailv₂ : vector α (m + n), apply ih, refl, 
-  rw [nat.add_right_comm] at h, 
-  exact eq.rec_on (eq.symm h) cons head tailv₂
-end
+def sample_val : ℕ → ℕ
+| 0 := 5
+| 1 := 6
+| _ := 0
 
-def append {α : Type*} {m n : ℕ} (v₁ : vector α m) (v₂ : vector α n) :  vector α (m + n):=
-append_aux v₁ v₂ (m + n) rfl
+def simp_const : aexpr →  aexpr
+| (plus (const n) (const m))  := const (n + m)
+| (times (const n) (const m)) := const (n * m)
+| x                           := x
 
-end vector
+def fuse : aexpr → aexpr
+| (const n) := const n
+| (var n)   := var n
+| (plus e₁ e₂) := simp_const (plus (fuse e₁) (fuse e₂))
+| (times e₁ e₂) := simp_const (times (fuse e₁) (fuse e₂))
+
+theorem simp_const_eq (v : ℕ → ℕ) : ∀ e : aexpr, aeval v (simp_const e) = aeval
+v e 
+| (const n) := rfl
+| (var n)   := rfl
+| (plus x y) := 
+  match x with 
+  | (const n)   := 
+    match y with 
+    | (const n)   := rfl
+    | (var n)     := by { simp[simp_const] } 
+    | (plus e₁ e₂) := by { simp[simp_const] } 
+    | (times e₁ e₂):= by { simp[simp_const] } 
+    end
+  | (var n)     := by { simp[simp_const] } 
+  | (plus e₁ e₂) := by { simp[simp_const] } 
+  | (times e₁ e₂):= by { simp[simp_const] } 
+  end
+| (times x y) := 
+  match x with 
+  | (const n)   := 
+    match y with 
+    | (const n)   := rfl
+    | (var n)     := by { simp[simp_const] } 
+    | (plus e₁ e₂) := by { simp[simp_const] } 
+    | (times e₁ e₂):= by { simp[simp_const] } 
+    end
+  | (var n)     := by { simp[simp_const] } 
+  | (plus e₁ e₂) := by { simp[simp_const] } 
+  | (times e₁ e₂):= by { simp[simp_const] } 
+  end
+  -- surely there's a nicer way to do the above
+theorem fuse_eq (v : ℕ → ℕ) :
+  ∀ e : aexpr, aeval v (fuse e) = aeval v e 
+| (const n) := rfl
+| (var m)   := rfl
+| (plus e₁ e₂) := by {simp[fuse, simp_const_eq, aeval, fuse_eq]}
+| (times e₁ e₂) := by {simp[fuse, simp_const_eq, aeval, fuse_eq]}
